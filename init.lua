@@ -166,7 +166,7 @@ local augroup = vim.api.nvim_create_augroup("UserConfig", {})
 vim.api.nvim_create_autocmd("TextYankPost", {
   group = augroup,
   callback = function()
-    vim.highlight.on_yank()
+    vim.hl.on_yank()
   end,
 })
 
@@ -194,6 +194,16 @@ vim.api.nvim_create_autocmd("VimResized", {
   end,
 })
 
+-- Auto-close terminal when process exits
+vim.api.nvim_create_autocmd("TermClose", {
+  group = augroup,
+  callback = function()
+    if vim.v.event.status == 0 then
+      vim.api.nvim_buf_delete(0, {})
+    end
+  end,
+})
+
 -- Create directories when saving files
 vim.api.nvim_create_autocmd("BufWritePre", {
   group = augroup,
@@ -204,4 +214,418 @@ vim.api.nvim_create_autocmd("BufWritePre", {
     end
   end,
 })
+
+-- Command-line completion
+vim.opt.wildmenu = true
+vim.opt.wildmode = "longest:full,full"
+vim.opt.wildignore:append({ "*.o", "*.obj", "*.pyc", "*.class", "*.jar" })
+
+-- Better diff options
+vim.opt.diffopt:append("linematch:60")
+
+-- Performance improvements
+vim.opt.redrawtime = 10000
+vim.opt.maxmempattern = 20000
+
+-- ============================================================================
+-- FLOATING TERMINAL
+-- ============================================================================
+
+-- terminal
+local terminal_state = {
+  buf = nil,
+  win = nil,
+  is_open = false
+}
+
+local function FloatingTerminal()
+  -- If terminal is already open, close it (toggle behavior)
+  if terminal_state.is_open and vim.api.nvim_win_is_valid(terminal_state.win) then
+    vim.api.nvim_win_close(terminal_state.win, false)
+    terminal_state.is_open = false
+    return
+  end
+
+  -- Create buffer if it doesn't exist or is invalid
+  if not terminal_state.buf or not vim.api.nvim_buf_is_valid(terminal_state.buf) then
+    terminal_state.buf = vim.api.nvim_create_buf(false, true)
+    -- Set buffer options for better terminal experience
+    vim.bo[terminal_state.buf].bufhidden = 'hide'
+  end
+
+  -- Calculate window dimensions
+  local width = math.floor(vim.o.columns * 0.8)
+  local height = math.floor(vim.o.lines * 0.8)
+  local row = math.floor((vim.o.lines - height) / 2)
+  local col = math.floor((vim.o.columns - width) / 2)
+
+  -- Create the floating window
+  terminal_state.win = vim.api.nvim_open_win(terminal_state.buf, true, {
+    relative = 'editor',
+    width = width,
+    height = height,
+    row = row,
+    col = col,
+    style = 'minimal',
+    border = 'rounded',
+  })
+
+  -- Set transparency for the floating window
+  vim.wo[terminal_state.win].winblend = 0
+  vim.wo[terminal_state.win].winhighlight = 'Normal:FloatingTermNormal,FloatBorder:FloatingTermBorder'
+
+  -- Define highlight groups for transparency
+  vim.api.nvim_set_hl(0, "FloatingTermNormal", { bg = "none" })
+  vim.api.nvim_set_hl(0, "FloatingTermBorder", { bg = "none", })
+
+  -- Start terminal if not already running
+  local has_terminal = false
+  local lines = vim.api.nvim_buf_get_lines(terminal_state.buf, 0, -1, false)
+  for _, line in ipairs(lines) do
+    if line ~= "" then
+      has_terminal = true
+      break
+    end
+  end
+
+  if not has_terminal then
+    vim.fn.termopen(os.getenv("SHELL"))
+  end
+
+  terminal_state.is_open = true
+  vim.cmd("startinsert")
+
+  -- Set up auto-close on buffer leave 
+  vim.api.nvim_create_autocmd("BufLeave", {
+    buffer = terminal_state.buf,
+    callback = function()
+      if terminal_state.is_open and vim.api.nvim_win_is_valid(terminal_state.win) then
+        vim.api.nvim_win_close(terminal_state.win, false)
+        terminal_state.is_open = false
+      end
+    end,
+    once = true
+  })
+end
+
+-- Function to explicitly close the terminal
+local function CloseFloatingTerminal()
+  if terminal_state.is_open and vim.api.nvim_win_is_valid(terminal_state.win) then
+    vim.api.nvim_win_close(terminal_state.win, false)
+    terminal_state.is_open = false
+  end
+end
+
+-- Key mappings
+vim.keymap.set("n", "<leader>t", FloatingTerminal, { noremap = true, silent = true, desc = "Toggle floating terminal" })
+vim.keymap.set("t", "<Esc>", CloseFloatingTerminal, { noremap = true, silent = true, desc = "Close floating terminal from terminal mode" })
+
+
+-- ============================================================================
+-- TABS
+-- ============================================================================
+
+-- Tab display settings
+vim.opt.showtabline = 1  -- Always show tabline (0=never, 1=when multiple tabs, 2=always)
+vim.opt.tabline = ''     -- Use default tabline (empty string uses built-in)
+
+-- Alternative navigation (more intuitive)
+vim.keymap.set('n', '<leader>tn', ':tabnew<CR>', { desc = 'New tab' })
+vim.keymap.set('n', '<leader>tx', ':tabclose<CR>', { desc = 'Close tab' })
+
+-- Tab moving
+vim.keymap.set('n', '<leader>tm', ':tabmove<CR>', { desc = 'Move tab' })
+vim.keymap.set('n', '<C+PageDown>', ':tabmove +1<CR>', { desc = 'Move tab right' })
+vim.keymap.set('n', '<C+PageDown>', ':tabmove -1<CR>', { desc = 'Move tab left' })
+
+-- Function to open file in new tab
+local function open_file_in_tab()
+  vim.ui.input({ prompt = 'File to open in new tab: ', completion = 'file' }, function(input)
+    if input and input ~= '' then
+      vim.cmd('tabnew ' .. input)
+    end
+  end)
+end
+
+-- Function to duplicate current tab
+local function duplicate_tab()
+  local current_file = vim.fn.expand('%:p')
+  if current_file ~= '' then
+    vim.cmd('tabnew ' .. current_file)
+  else
+    vim.cmd('tabnew')
+  end
+end
+
+-- Function to close tabs to the right
+local function close_tabs_right()
+  local current_tab = vim.fn.tabpagenr()
+  local last_tab = vim.fn.tabpagenr('$')
+
+  for i = last_tab, current_tab + 1, -1 do
+    vim.cmd(i .. 'tabclose')
+  end
+end
+
+-- Function to close tabs to the left
+local function close_tabs_left()
+  local current_tab = vim.fn.tabpagenr()
+
+  for i = current_tab - 1, 1, -1 do
+    vim.cmd('1tabclose')
+  end
+end
+
+-- Enhanced keybindings
+vim.keymap.set('n', '<leader>tO', open_file_in_tab, { desc = 'Open file in new tab' })
+vim.keymap.set('n', '<leader>td', duplicate_tab, { desc = 'Duplicate current tab' })
+vim.keymap.set('n', '<leader>tr', close_tabs_right, { desc = 'Close tabs to the right' })
+vim.keymap.set('n', '<leader>tL', close_tabs_left, { desc = 'Close tabs to the left' })
+
+-- Function to close buffer but keep tab if it's the only buffer in tab
+local function smart_close_buffer()
+  local buffers_in_tab = #vim.fn.tabpagebuflist()
+  if buffers_in_tab > 1 then
+    vim.cmd('bdelete')
+  else
+    -- If it's the only buffer in tab, close the tab
+    vim.cmd('tabclose')
+  end
+end
+vim.keymap.set('n', '<leader>bd', smart_close_buffer, { desc = 'Smart close buffer/tab' })
+
+
+-- ============================================================================
+-- STATUSLINE
+-- ============================================================================
+
+-- Git branch function with caching and Nerd Font icon
+local cached_branch = ""
+local last_check = 0
+local function git_branch()
+  local now = vim.loop.now()
+  if now - last_check > 5000 then  -- Check every 5 seconds
+    cached_branch = vim.fn.system("git branch --show-current 2>/dev/null | tr -d '\n'")
+    last_check = now
+  end
+  if cached_branch ~= "" then
+    return " \u{e725} " .. cached_branch .. " "  -- nf-dev-git_branch
+  end
+  return ""
+end
+
+-- File type with Nerd Font icon
+local function file_type()
+  local ft = vim.bo.filetype
+  local icons = {
+    lua = "\u{e620} ",           -- nf-dev-lua
+    python = "\u{e73c} ",        -- nf-dev-python
+    javascript = "\u{e74e} ",    -- nf-dev-javascript
+    typescript = "\u{e628} ",    -- nf-dev-typescript
+    javascriptreact = "\u{e7ba} ",
+    typescriptreact = "\u{e7ba} ",
+    html = "\u{e736} ",          -- nf-dev-html5
+    css = "\u{e749} ",           -- nf-dev-css3
+    scss = "\u{e749} ",
+    json = "\u{e60b} ",          -- nf-dev-json
+    markdown = "\u{e73e} ",      -- nf-dev-markdown
+    vim = "\u{e62b} ",           -- nf-dev-vim
+    sh = "\u{f489} ",            -- nf-oct-terminal
+    bash = "\u{f489} ",
+    zsh = "\u{f489} ",
+    rust = "\u{e7a8} ",          -- nf-dev-rust
+    go = "\u{e724} ",            -- nf-dev-go
+    c = "\u{e61e} ",             -- nf-dev-c
+    cpp = "\u{e61d} ",           -- nf-dev-cplusplus
+    java = "\u{e738} ",          -- nf-dev-java
+    php = "\u{e73d} ",           -- nf-dev-php
+    ruby = "\u{e739} ",          -- nf-dev-ruby
+    swift = "\u{e755} ",         -- nf-dev-swift
+    kotlin = "\u{e634} ",
+    dart = "\u{e798} ",
+    elixir = "\u{e62d} ",
+    haskell = "\u{e777} ",
+    sql = "\u{e706} ",
+    yaml = "\u{f481} ",
+    toml = "\u{e615} ",
+    xml = "\u{f05c} ",
+    dockerfile = "\u{f308} ",    -- nf-linux-docker
+    gitcommit = "\u{f418} ",     -- nf-oct-git_commit
+    gitconfig = "\u{f1d3} ",     -- nf-fa-git
+    vue = "\u{fd42} ",           -- nf-md-vuejs
+    svelte = "\u{e697} ",
+    astro = "\u{e628} ",
+  }
+
+  if ft == "" then
+    return " \u{f15b} "          -- nf-fa-file_o
+  end
+
+  return (icons[ft] or " \u{f15b} " .. ft)
+end
+
+-- File size with Nerd Font icon
+local function file_size()
+  local size = vim.fn.getfsize(vim.fn.expand('%'))
+  if size < 0 then return "" end
+  
+  local size_str
+  if size < 1024 then
+    size_str = size .. "B"
+  elseif size < 1024 * 1024 then
+    size_str = string.format("%.1fK", size / 1024)
+  else
+    size_str = string.format("%.1fM", size / 1024 / 1024)
+  end
+  
+  return " \u{f016} " .. size_str .. " "  -- nf-fa-file_o
+end
+
+-- Mode indicators with Nerd Font icons
+local function mode_icon()
+  local mode = vim.fn.mode()
+  local modes = {
+    n = " \u{f040} NORMAL",      -- nf-fa-pencil
+    i = " \u{f303} INSERT",      -- nf-linux-vim
+    v = " \u{f06e} VISUAL",      -- nf-fa-eye
+    V = " \u{f06e} V-LINE",
+    ["\22"] = " \u{f06e} V-BLOCK",  -- Ctrl-V
+    c = " \u{f120} COMMAND",     -- nf-fa-terminal
+    s = " \u{f0c5} SELECT",      -- nf-fa-files_o
+    S = " \u{f0c5} S-LINE",
+    ["\19"] = " \u{f0c5} S-BLOCK",  -- Ctrl-S
+    R = " \u{f044} REPLACE",     -- nf-fa-edit
+    r = " \u{f044} REPLACE",
+    ["!"] = " \u{f489} SHELL",   -- nf-oct-terminal
+    t = " \u{f120} TERMINAL"     -- nf-fa-terminal
+  }
+  return modes[mode] or " \u{f059} " .. mode:upper()  -- nf-fa-question_circle
+end
+
+_G.mode_icon = mode_icon
+_G.git_branch = git_branch
+_G.file_type = file_type
+_G.file_size = file_size
+
+vim.cmd([[
+  highlight StatusLineBold gui=bold cterm=bold
+]])
+
+-- Function to change statusline based on window focus
+local function setup_dynamic_statusline()
+  vim.api.nvim_create_autocmd({"WinEnter", "BufEnter"}, {
+    callback = function()
+    vim.opt_local.statusline = table.concat {
+      "  ",
+      "%#StatusLineBold#",
+      "%{v:lua.mode_icon()}",
+      "%#StatusLine#",
+      " \u{e0b1} %f %h%m%r",     -- nf-pl-left_hard_divider
+      "%{v:lua.git_branch()}",
+      "\u{e0b1} ",               -- nf-pl-left_hard_divider
+      "%{v:lua.file_type()}",
+      "\u{e0b1} ",               -- nf-pl-left_hard_divider
+      "%{v:lua.file_size()}",
+      "%=",                      -- Right-align everything after this
+      " \u{f017} %l:%c  %P ",    -- nf-fa-clock_o for line/col
+    }
+    end
+  })
+  vim.api.nvim_set_hl(0, "StatusLineBold", { bold = true })
+
+  vim.api.nvim_create_autocmd({"WinLeave", "BufLeave"}, {
+    callback = function()
+      vim.opt_local.statusline = "  %f %h%m%r \u{e0b1} %{v:lua.file_type()} %=  %l:%c   %P "
+    end
+  })
+end
+
+setup_dynamic_statusline()
+
+
+-- ============================================================================
+-- LSP CONFIGURATION
+-- ============================================================================
+
+
+-- LSP settings
+local function setup_lsp()
+  vim.lsp.config('clangd', {
+      cmd = { 'clangd' },
+      filetypes = { 'c', 'cpp', 'h', 'hpp' },
+  })
+  
+  vim.lsp.enable ({ 'clangd' })
+  
+
+  -- Show diagnostic signs in the gutter
+  local signs = {
+    Error = "\u{f06a} ", -- nf-fa-exclamation_circle
+    Warn = "\u{f071} ",  -- nf-fa-exclamation_triangle
+    Hint = "\u{f0eb} ",  -- nf-fa-lightbulb_o
+    Info = "\u{f05a} "   -- nf-fa-info_circle
+  }
+
+  for type, icon in pairs(signs) do
+    local hl = "DiagnosticSign" .. type
+    vim.fn.sign_define(hl, { text = icon, texthl = hl, numhl = hl })
+  end
+
+  -- Diagnostic configuration
+  vim.diagnostic.config({
+    virtual_text = {
+      prefix = '●',
+      spacing = 4,
+    },
+    signs = true,
+    underline = true,
+    update_in_insert = false,
+    severity_sort = true,
+    float = {
+      border = 'rounded',
+      source = 'always',
+      header = '',
+      prefix = '',
+    },
+  })
+
+  -- LSP keymaps (set when LSP attaches)
+  vim.api.nvim_create_autocmd('LspAttach', {
+    group = augroup,
+    callback = function(ev)
+      local opts = { buffer = ev.buf }
+--      vim.keymap.set('n', 'gl', vim.diagnostic.open_float)
+      vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, opts)
+      vim.keymap.set('n', 'gd', vim.lsp.buf.definition, opts)
+      vim.keymap.set('n', 'K', vim.lsp.buf.hover, opts)
+      vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, opts)
+      vim.keymap.set('n', '<C-k>', vim.lsp.buf.signature_help, opts)
+      vim.keymap.set('n', '<leader>D', vim.lsp.buf.type_definition, opts)
+      vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, opts)
+      vim.keymap.set('n', '<leader>ca', vim.lsp.buf.code_action, opts)
+      vim.keymap.set('n', 'gr', vim.lsp.buf.references, opts)
+      vim.keymap.set('n', '<leader>f', function()
+        vim.lsp.buf.format { async = true }
+      end, opts)
+    end,
+  })
+
+  -- Floating window borders
+  local orig_util_open_floating_preview = vim.lsp.util.open_floating_preview
+  function vim.lsp.util.open_floating_preview(contents, syntax, opts, ...)
+    opts = opts or {}
+    opts.border = opts.border or 'rounded'
+    return orig_util_open_floating_preview(contents, syntax, opts, ...)
+  end
+end
+
+-- LSP diagnostic keymaps (always available)
+vim.keymap.set('n', 'pd', vim.diagnostic.goto_prev, { desc = 'Previous diagnostic' })
+vim.keymap.set('n', 'nd', vim.diagnostic.goto_next, { desc = 'Next diagnostic' })
+vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic list' })
+vim.keymap.set('n', '<leader>dl', vim.diagnostic.open_float, { desc = 'Show line diagnostics' })
+
+setup_lsp()
+
+vim.o.autocomplete = true
 
