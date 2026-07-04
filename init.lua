@@ -13,6 +13,8 @@ vim.api.nvim_set_hl(0, "TabLine", { bg = "none" })
 vim.api.nvim_set_hl(0, "TabLineSel", { bg = "none" })
 vim.api.nvim_set_hl(0, "ColorColumn", { bg = "none" })
 
+-- vim.opt.grepprg = "grep -HRIn $* ."
+
 -- Basic settings
 vim.opt.number = true                              -- Line numbers
 vim.opt.relativenumber = true                      -- Relative line numbers
@@ -142,8 +144,16 @@ vim.keymap.set("v", "<", "<gv", { desc = "Indent left and reselect" })
 vim.keymap.set("v", ">", ">gv", { desc = "Indent right and reselect" })
 
 -- Quick file navigation
-vim.keymap.set("n", "<leader>e", ":Explore<CR>", { desc = "Open file explorer" })
-vim.keymap.set("n", "<leader>ff", ":find ", { desc = "Find file" })
+vim.keymap.set("n", "<leader>e",  ":Explore<CR>", { desc = "Open file explorer" })
+vim.keymap.set("n", "<leader>l",  ":Lex<CR>",     { desc = "Open file tree in split view" })
+vim.keymap.set("n", "<leader>ff", ":find ",       { desc = "Find file" })
+vim.keymap.set("n", "<leader>gg", ":copen | :silent : grep ", { desc = "Grep in all it's glory." })
+vim.keymap.set("n", "]q", ":cnext <CR>", { desc = "Next grep result" })
+vim.keymap.set("n", "[q", ":cprev <CR>", { desc = "Previous grep result" })
+-- NOTE: :copen opens grep results!
+-- Check this:  vim marks!  
+-- m<letter> creates a mark (bookmark).  '<letter> takes you back to the line.  `<letter> takes you the he column
+-- :delmark <letter> deletes the mark
 
 -- Better J behavior
 vim.keymap.set("n", "J", "mzJ`z", { desc = "Join lines and keep cursor position" })
@@ -154,9 +164,9 @@ vim.keymap.set("n", "<leader>rl", ":so $MYVIMRC<CR>", { desc = "Reload config" }
 
 -- Copy Full File-Path
 vim.keymap.set("n", "<leader>pa", function()
-	local path = vim.fn.expand("%:p")
-	vim.fn.setreg("+", path)
-	print("file:", path)
+    local path = vim.fn.expand("%:p")
+    vim.fn.setreg("+", path)
+    print("file:", path)
 end)
 
 -- Basic autocommands
@@ -627,5 +637,4 @@ vim.keymap.set('n', '<leader>dl', vim.diagnostic.open_float, { desc = 'Show line
 
 setup_lsp()
 
-vim.o.autocomplete = true
 
