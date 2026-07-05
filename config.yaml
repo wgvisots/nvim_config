@@ -1,0 +1,25 @@
+---
+#this goes in ~/.config/clangd/
+Diagnostics:
+  # Enable project-wide include scanning natively
+  UnusedIncludes: Strict
+  MissingIncludes: Strict
+
+  ClangTidy:
+    # Activate all high-level bug and architectural metrics
+    Add: [
+      clang-analyzer-*,
+      clang-analyzer-security*,
+      bugprone-*,
+      cert-*,
+      misc-*,
+      modernize-*,
+      performance-*,
+      readability-*,
+      readability-function-cognitive-complexity
+    ]
+    # Remove conflicting rules that trigger noisy layout warnings
+    Remove: [
+      readability-braces-around-statements,
+      modernize-use-trailing-return-type
+    ]
