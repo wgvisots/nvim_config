@@ -561,7 +561,11 @@ setup_dynamic_statusline()
 -- LSP settings
 local function setup_lsp()
   vim.lsp.config('clangd', {
-      cmd = { 'clangd' },
+      cmd = { 'clangd',
+              '--clang-tidy',
+              '--header-insertion=iwyu',
+              '--completion-style=detailed',
+              '--function-arg-placeholders=true'},
       filetypes = { 'c', 'cpp', 'h', 'hpp' },
   })
   
