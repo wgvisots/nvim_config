@@ -562,15 +562,16 @@ setup_dynamic_statusline()
 local function setup_lsp()
   vim.lsp.config('clangd', {
       cmd = { 'clangd',
-              '--clang-tidy',
               '--header-insertion=iwyu',
               '--completion-style=detailed',
-              '--function-arg-placeholders=true'},
+              '--function-arg-placeholders=true',
+              '--query-driver=/usr/bin/g++,/usr/bin/clang++,/usr/bin/c++' },
       filetypes = { 'c', 'cpp', 'h', 'hpp' },
   })
   
   vim.lsp.enable ({ 'clangd' })
   
+  vim.o.autocomplete = true
 
   -- Show diagnostic signs in the gutter
   local signs = {
