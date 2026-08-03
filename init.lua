@@ -404,6 +404,44 @@ local function smart_close_buffer()
 end
 vim.keymap.set('n', '<leader>bd', smart_close_buffer, { desc = 'Smart close buffer/tab' })
 
+-- Define distinct custom highlights (Adjust colors if desired)
+-- Active Tab: Dark background with bright green text
+vim.api.nvim_set_hl(0, "CustomTabActive", { fg = "#A6E22E", bg = "#232526", bold = true })
+-- Inactive Tab: Gray text on a darker background
+vim.api.nvim_set_hl(0, "CustomTabInactive", { fg = "#75715E", bg = "#1B1D1E" })
+-- Empty Tabline Space: Matches the main editor background
+vim.api.nvim_set_hl(0, "CustomTabFill", { bg = "#121212" })
+
+function _G.custom_tabline()
+  local s = ""
+  for i = 1, vim.fn.tabpagenr('$') do
+    -- Highlight active vs inactive tabs
+    if i == vim.fn.tabpagenr() then
+      s = s .. "%#CustomTabActive#"
+    else
+      s = s .. "%#CustomTabInactive#"
+    end
+
+    -- Add custom "border" characters around each tab label
+    local winnr = vim.fn.tabpagewinnr(i)
+    local buflist = vim.fn.tabpagebuflist(i)
+    local bufnr = buflist[winnr]
+    local fname = vim.fn.bufname(bufnr)
+    local name = vim.fn.fnamemodify(fname, ":t")
+    if name == "" then name = "[No Name]" end
+
+    -- Clickable tab item marker (%{i}T) and padded box style
+    s = s .. "%" .. i .. "T"
+    s = s .. " ╭ " .. name .. " ╮ "
+  end
+
+  -- Fill the rest of the tabline with background highlight and reset
+  s = s .. "%#TabLineFill#"
+  return s
+end
+
+-- Assign the function to Neovim's global tabline option
+vim.opt.tabline = "%!v:lua.custom_tabline()
 
 -- ============================================================================
 -- STATUSLINE
