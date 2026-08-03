@@ -239,12 +239,12 @@ vim.opt.maxmempattern = 20000
 
 
 -- ============================================================================
--- FLOATING TERMINAL
+-- FILE EXPLORER
 -- ============================================================================
 vim.g.netrw_liststyle = 3
 vim.g.netrw_banner = 0
 vim.g.netrw_winsize = 25
-vim.keymap.set("n", "<leader>le", ":Lex", { desc = "Open left-side file explorer." })
+vim.keymap.set("n", "<leader>le", ":Lex<CR>", { desc = "Open left-side file explorer." })
 -- ============================================================================
 -- FLOATING TERMINAL
 -- ============================================================================
