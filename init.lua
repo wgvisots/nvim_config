@@ -237,6 +237,14 @@ vim.opt.diffopt:append("linematch:60")
 vim.opt.redrawtime = 10000
 vim.opt.maxmempattern = 20000
 
+
+-- ============================================================================
+-- FLOATING TERMINAL
+-- ============================================================================
+vim.g.netrw_liststyle = 3
+vim.g.netrw_banner = 0
+vim.g.netrw_winsize = 25
+vim.keymap.set("n", "<leader>le", ":Lex", { desc = "Open left-side file explorer." })
 -- ============================================================================
 -- FLOATING TERMINAL
 -- ============================================================================
