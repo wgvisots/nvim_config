@@ -678,6 +678,24 @@ local function setup_lsp()
     opts.border = opts.border or 'rounded'
     return orig_util_open_floating_preview(contents, syntax, opts, ...)
   end
+
+  vim.keymap.set("n", "gh", function()
+    local bufnr = vim.api.nvim_get_current_buf()
+    -- Request clangd's specific URI-switch capability
+    vim.lsp.buf_request(bufnr, "textDocument/switchSourceHeader", { uri = vim.uri_from_bufnr(bufnr) }, function(err, result)
+      if err then 
+        vim.notify("LSP Error: " .. err.message, vim.log.levels.ERROR) 
+        return 
+      end
+      if not result then 
+        vim.notify("No corresponding source or header file found.", vim.log.levels.WARN) 
+        return 
+      end
+      -- Open the matching file returned by clangd
+      vim.cmd("edit " .. vim.uri_to_fname(result))
+    end)
+  end, { desc = "Clangd: Switch Source/Header" })
+  
 end
 
 -- LSP diagnostic keymaps (always available)
