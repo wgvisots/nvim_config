@@ -13,7 +13,7 @@ vim.api.nvim_set_hl(0, "TabLine", { bg = "none" })
 vim.api.nvim_set_hl(0, "TabLineSel", { bg = "none" })
 vim.api.nvim_set_hl(0, "ColorColumn", { bg = "none" })
 
--- vim.opt.grepprg = "grep -HRIn $* ."
+vim.opt.grepprg = "grep -HRIn $* ."
 
 -- Basic settings
 vim.opt.number = true                              -- Line numbers
@@ -69,7 +69,7 @@ vim.opt.undofile = true                            -- Persistent undo
 vim.opt.undodir = vim.fn.expand("~/.vim/undodir")  -- Undo directory
 vim.opt.updatetime = 300                           -- Faster completion
 vim.opt.timeoutlen = 500                           -- Key timeout duration
-vim.opt.ttimeoutlen = 0                            -- Key code timeout
+vim.opt.ttimeoutlen = 50                           -- Key code timeout
 vim.opt.autoread = true                            -- Auto reload files changed outside vim
 vim.opt.autowrite = false                          -- Don't auto save
 
@@ -101,6 +101,9 @@ vim.opt.splitright = true                          -- Vertical splits go right
 -- Key mappings
 vim.g.mapleader = " "                              -- Set leader key to space
 vim.g.maplocalleader = " "                         -- Set local leader key (NEW)
+
+vim.opt.list = true
+vim.opt.listchars = { tab = '» ' }
 
 -- Normal mode mappings
 -- vim.keymap.set("n", "<leader>c", ":nohlsearch<CR>", { desc = "Clear search highlights" })
@@ -138,6 +141,8 @@ vim.keymap.set("n", "<C-Up>", ":resize +2<CR>", { desc = "Increase window height
 vim.keymap.set("n", "<C-Down>", ":resize -2<CR>", { desc = "Decrease window height" })
 vim.keymap.set("n", "<C-Left>", ":vertical resize +2<CR>", { desc = "Decrease window width" })
 vim.keymap.set("n", "<C-Right>", ":vertical resize -2<CR>", { desc = "Increase window width" })
+-- vim.api.nvim_set_hl(0, "WinSeparator", { fg = "#444444", bg = "NONE" })
+vim.api.nvim_set_hl(0, "NormalNC", { bg = "#1e1e24" })
 
 -- Better indenting in visual mode
 vim.keymap.set("v", "<", "<gv", { desc = "Indent left and reselect" })
@@ -162,6 +167,8 @@ vim.keymap.set("n", "J", "mzJ`z", { desc = "Join lines and keep cursor position"
 vim.keymap.set("n", "<leader>rc", ":e $MYVIMRC<CR>", { desc = "Edit config" })
 vim.keymap.set("n", "<leader>rl", ":so $MYVIMRC<CR>", { desc = "Reload config" })
 
+-- Replace the word under the cursor with the paste buffer
+vim.keymap.set("n", "<leader>pp", "viwP", { desc = "Replace the word under the cursor with the copied text" })
 -- Copy Full File-Path
 vim.keymap.set("n", "<leader>pa", function()
     local path = vim.fn.expand("%:p")
@@ -237,14 +244,14 @@ vim.opt.diffopt:append("linematch:60")
 vim.opt.redrawtime = 10000
 vim.opt.maxmempattern = 20000
 
+-- ============================================================================
+-- FILE EXPLORING
+-- ============================================================================
+-- vim.g.netrw_liststyle = 2
+-- vim.g.netrw_winsize = 25
+-- vim.g.netrw_banner = 0
+vim.keymap.set("n", "<leader>le", ":Lex<CR>", { desc = "Open Left-side file explorer." })
 
--- ============================================================================
--- FILE EXPLORER
--- ============================================================================
-vim.g.netrw_liststyle = 3
-vim.g.netrw_banner = 0
-vim.g.netrw_winsize = 25
-vim.keymap.set("n", "<leader>le", ":Lex<CR>", { desc = "Open left-side file explorer." })
 -- ============================================================================
 -- FLOATING TERMINAL
 -- ============================================================================
@@ -344,8 +351,8 @@ vim.keymap.set("t", "<Esc>", CloseFloatingTerminal, { noremap = true, silent = t
 -- ============================================================================
 
 -- Tab display settings
-vim.opt.showtabline = 1  -- Always show tabline (0=never, 1=when multiple tabs, 2=always)
-vim.opt.tabline = ''     -- Use default tabline (empty string uses built-in)
+vim.opt.showtabline = 2  -- Always show tabline (0=never, 1=when multiple tabs, 2=always)
+-- vim.opt.tabline = ''     -- Use default tabline (empty string uses built-in)
 
 -- Alternative navigation (more intuitive)
 vim.keymap.set('n', '<leader>tn', ':tabnew<CR>', { desc = 'New tab' })
@@ -449,7 +456,7 @@ function _G.custom_tabline()
 end
 
 -- Assign the function to Neovim's global tabline option
-vim.opt.tabline = "%!v:lua.custom_tabline()
+vim.opt.tabline = "%!v:lua.custom_tabline()"
 
 -- ============================================================================
 -- STATUSLINE
@@ -604,20 +611,30 @@ setup_dynamic_statusline()
 -- ============================================================================
 
 
--- LSP settings
+vim.keymap.set("i", "<C-Space>", "<C-x><C-o>", {noremap=true, silent=true} )
+
+-- LSP settings -- other filetypes:  'h', 'hpp' 
 local function setup_lsp()
   vim.lsp.config('clangd', {
       cmd = { 'clangd',
               '--header-insertion=iwyu',
               '--completion-style=detailed',
               '--function-arg-placeholders=true',
-              '--query-driver=/usr/bin/g++,/usr/bin/clang++,/usr/bin/c++' },
-      filetypes = { 'c', 'cpp', 'h', 'hpp' },
+              '--query-driver=/usr/bin/g++,/usr/bin/clang++,/usr/bin/c++,/usr/bin/gcc,/usr/bin/clang'},
+      filetypes = { 'c', 'cpp'},
+      on_attach = function(client, bufnr)
+        -- Enable built-in omnicomplete powered by the LSP
+        vim.api.nvim_buf_set_option(bufnr, "omnifunc", "v:lua.vim.lsp.omnifunc")
+    
+        -- Useful built-in LSP Keymaps for navigation
+        local opts = { buffer = bufnr, silent = true }
+        vim.keymap.set("n", "gd", vim.lsp.buf.definition, opts)
+        vim.keymap.set("n", "K",  vim.lsp.buf.hover,      opts)
+--        vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, opts)
+      end,
   })
   
   vim.lsp.enable ({ 'clangd' })
-  
-  vim.o.autocomplete = true
 
   -- Show diagnostic signs in the gutter
   local signs = {
@@ -651,23 +668,91 @@ local function setup_lsp()
   })
 
   -- LSP keymaps (set when LSP attaches)
+--  vim.api.nvim_create_autocmd('LspAttach', {
+--    group = augroup,
+--    callback = function(ev)
+--        local client = vim.lsp.get_client_by_id(args.data.client_id)
+--    
+--        -- Enable native autocomplete UI popup as you type
+--        if client and client.supports_method("textDocument/completion") then
+--          vim.lsp.completion.enable(true, client.id, args.buf, { autotrigger = true })
+--        end
+--
+--        -- Tab completion keymaps
+--        local opts = { buffer = args.buf }
+--
+--        -- Use Tab to navigate forward in the popup menu or trigger it manually
+--        vim.keymap.set("i", "<Tab>", function()
+--          if vim.fn.pumvisible() == 1 then
+--            return "<C-n>"
+--          else
+--            return "<Tab>"
+--          end
+--        end, { expr = true, buffer = args.buf })
+--
+--        -- Use Shift+Tab to navigate backward in the popup menu
+--        vim.keymap.set("i", "<S-Tab>", function()
+--          if vim.fn.pumvisible() == 1 then
+--            return "<C-p>"
+--          else
+--            return "<S-Tab>"
+--          end
+--        end, { expr = true, buffer = args.buf })
+--
+--
+----      vim.keymap.set('n', 'gl', vim.diagnostic.open_float)
+--        vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, opts)
+--        vim.keymap.set('n', 'gd', vim.lsp.buf.definition, opts)
+--        vim.keymap.set('n', 'K', vim.lsp.buf.hover, opts)
+--        vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, opts)
+--        vim.keymap.set('n', '<C-k>', vim.lsp.buf.signature_help, opts)
+--        vim.keymap.set('n', '<leader>D', vim.lsp.buf.type_definition, opts)
+--        vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, opts)
+--        vim.keymap.set('n', '<leader>ca', vim.lsp.buf.code_action, opts)
+--        vim.keymap.set('n', 'gr', vim.lsp.buf.references, opts)
+--        vim.keymap.set('n', '<leader>f', function()
+--          vim.lsp.buf.format { async = true }
+--        end, opts)
+--    end,
+--  })
   vim.api.nvim_create_autocmd('LspAttach', {
     group = augroup,
     callback = function(ev)
       local opts = { buffer = ev.buf }
---      vim.keymap.set('n', 'gl', vim.diagnostic.open_float)
-      vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, opts)
-      vim.keymap.set('n', 'gd', vim.lsp.buf.definition, opts)
-      vim.keymap.set('n', 'K', vim.lsp.buf.hover, opts)
-      vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, opts)
-      vim.keymap.set('n', '<C-k>', vim.lsp.buf.signature_help, opts)
-      vim.keymap.set('n', '<leader>D', vim.lsp.buf.type_definition, opts)
-      vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, opts)
-      vim.keymap.set('n', '<leader>ca', vim.lsp.buf.code_action, opts)
-      vim.keymap.set('n', 'gr', vim.lsp.buf.references, opts)
+      local client = vim.lsp.get_client_by_id(ev.data.client_id)
+      vim.lsp.completion.enable(true, client.id, ev.buf, { autotrigger = true })
+      vim.keymap.set("i", "<Tab>", function()
+        if vim.fn.pumvisible() == 1 then
+          return "<C-n>"
+        else
+          return "<Tab>"
+        end
+      end, { expr = true, buffer = ev.buf })
+      vim.keymap.set('n', 'gl', vim.diagnostic.open_float)
+      vim.keymap.set('n', 'gD',         vim.lsp.buf.declaration,     opts)
+      vim.keymap.set('n', 'gd',         vim.lsp.buf.definition,      opts)
+      vim.keymap.set('n', 'K',          vim.lsp.buf.hover,           opts)
+      vim.keymap.set('n', 'gi',         vim.lsp.buf.implementation,  opts)
+      vim.keymap.set('n', '<C-k>',      vim.lsp.buf.signature_help,  opts)
+      vim.keymap.set('n', '<leader>D',  vim.lsp.buf.type_definition, opts)
+      vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename,          opts)
+      vim.keymap.set('n', '<leader>ca', vim.lsp.buf.code_action,     opts)
+      vim.keymap.set('n', 'gr',         vim.lsp.buf.references,      opts)
       vim.keymap.set('n', '<leader>f', function()
         vim.lsp.buf.format { async = true }
       end, opts)
+
+      -- Only apply to clangd and buffers that support folding ranges
+      if client and client.name == "clangd" and client:supports_method("textDocument/foldingRange") then
+          -- Use the native LSP folding expression
+          vim.wo.foldmethod = "expr"
+          vim.wo.foldexpr = "v:lua.vim.lsp.foldexpr()"
+          
+          -- Prevent everything from collapsing immediately when opening a file
+          vim.wo.foldlevel = 99
+--          vim.wo.foldlevelstart = 99
+          vim.wo.foldenable = true
+      end
     end,
   })
 
@@ -695,15 +780,112 @@ local function setup_lsp()
       vim.cmd("edit " .. vim.uri_to_fname(result))
     end)
   end, { desc = "Clangd: Switch Source/Header" })
-  
 end
 
+
+
+
+vim.keymap.set('n', '<leader>dt', function()
+  -- Read the current configuration state
+  local current_state = vim.diagnostic.config().virtual_text
+  
+  -- Toggle just the virtual_text setting
+  vim.diagnostic.config({
+    virtual_text = not current_state
+  })
+  --if vim.diagnostic.is_enabled() then
+  --  vim.diagnostic.enable(false)
+  --else
+  --  vim.diagnostic.enable(true)
+  --end
+end, { desc = 'Toggle diagnostics' })
+
 -- LSP diagnostic keymaps (always available)
-vim.keymap.set('n', 'pd', vim.diagnostic.goto_prev, { desc = 'Previous diagnostic' })
-vim.keymap.set('n', 'nd', vim.diagnostic.goto_next, { desc = 'Next diagnostic' })
-vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic list' })
+vim.keymap.set('n', 'pd',         vim.diagnostic.goto_prev,  { desc = 'Previous diagnostic' })
+vim.keymap.set('n', 'nd',         vim.diagnostic.goto_next,  { desc = 'Next diagnostic' })
+vim.keymap.set('n', '<leader>q',  vim.diagnostic.setloclist, { desc = 'Open diagnostic list' })
 vim.keymap.set('n', '<leader>dl', vim.diagnostic.open_float, { desc = 'Show line diagnostics' })
 
 setup_lsp()
 
+-- Opens git blame for the current file in a vertical split window
+vim.keymap.set('n', '<leader>gb', function()
+  local file = vim.api.nvim_buf_get_name(0)
+  vim.cmd('vsplit | terminal git blame ' .. vim.fn.shellescape(file))
+end, { desc = 'Git Blame in Split' })
+
+
+
+local blame_ns = vim.api.nvim_create_namespace("InlineGitBlame")
+
+-- 1. Initialize the global toggle state (disabled by default)
+vim.g.git_blame_enabled = false
+
+local function show_git_blame()
+  -- Always clear the previous text first
+  vim.api.nvim_buf_clear_namespace(0, blame_ns, 0, -1)
+
+  -- 2. Exit early if the feature is toggled off
+  if not vim.g.git_blame_enabled then return end
+
+  local file = vim.api.nvim_buf_get_name(0)
+  if file == "" or vim.bo.buftype ~= "" then return end
+
+  local line = vim.api.nvim_win_get_cursor(0)[1]
+  
+  local cmd = string.format("git blame -L %d,%d --porcelain %s", line, line, vim.fn.shellescape(file))
+  vim.fn.jobstart(cmd, {
+    stdout_buffered = true,
+    on_stdout = function(_, data)
+      if not data or #data < 4 then return end
+      
+      local author, summary, time_str = "Unknown", "No commit", nil
+      for _, l in ipairs(data) do
+        if l:match("^author ") then author = l:gsub("^author ", "") end
+        if l:match("^summary ") then summary = l:gsub("^summary ", "") end
+        if l:match("^author%-time ") then time_str = l:gsub("^author%-time ", "") end
+      end
+      
+      local date_str = ""
+      if time_str then
+        local timestamp = tonumber(time_str)
+        if timestamp then
+          date_str = os.date("%Y-%m-%d ", timestamp)
+        end
+      end
+      
+      -- Only draw if the toggle wasn't turned off while the async command ran
+      if vim.g.git_blame_enabled then
+        local text = string.format("  • %s%s (%s)", date_str, author, summary)
+        vim.api.nvim_buf_set_extmark(0, blame_ns, line - 1, 0, {
+          virt_text = { { text, "Comment" } },
+          hl_mode = "combine",
+        })
+      end
+    end,
+  })
+end
+
+-- 3. Create a function to handle the toggle action
+local function toggle_git_blame()
+  vim.g.git_blame_enabled = not vim.g.git_blame_enabled
+  if not vim.g.git_blame_enabled then
+    -- Clear text immediately when turning off
+    vim.api.nvim_buf_clear_namespace(0, blame_ns, 0, -1)
+    print("Git Blame: Disabled")
+  else
+    -- Show text immediately for the current line when turning on
+    show_git_blame()
+    print("Git Blame: Enabled")
+  end
+end
+
+-- 4. Map the toggle function to a shortcut (e.g., <leader>bt for Blame Toggle)
+vim.keymap.set('n', '<leader>gbb', toggle_git_blame, { desc = 'Toggle Inline Git Blame' })
+
+-- 5. Trigger updates as the cursor moves
+vim.api.nvim_create_autocmd({ "CursorHold", "CursorMoved" }, {
+  pattern = "*",
+  callback = show_git_blame,
+})
 
