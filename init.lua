@@ -55,18 +55,12 @@ vim.opt.lazyredraw = true                          -- Don't redraw during macros
 vim.opt.synmaxcol = 300                            -- Syntax highlighting limit 
 -- vim.opt.fillchars = { eob = " " }                  -- Hide ~ on empty lines
 
--- Create undo directory if it doesn't exist
-local undodir = vim.fn.expand("~/.vim/undodir")
-if vim.fn.isdirectory(undodir) == 0 then
-  vim.fn.mkdir(undodir, "p")
-end
 
 -- File handling
 vim.opt.backup = false                             -- Don't create backup files
 vim.opt.writebackup = false                        -- Don't create backup before writing
 vim.opt.swapfile = false                           -- Don't create swap files
 vim.opt.undofile = true                            -- Persistent undo
-vim.opt.undodir = vim.fn.expand("~/.vim/undodir")  -- Undo directory
 vim.opt.updatetime = 300                           -- Faster completion
 vim.opt.timeoutlen = 500                           -- Key timeout duration
 vim.opt.ttimeoutlen = 50                           -- Key code timeout
@@ -183,7 +177,7 @@ local augroup = vim.api.nvim_create_augroup("UserConfig", {})
 vim.api.nvim_create_autocmd("TextYankPost", {
   group = augroup,
   callback = function()
-    vim.hl.on_yank()
+    vim.hl.hl_op({ timeout = 400 })
   end,
 })
 
@@ -889,3 +883,48 @@ vim.api.nvim_create_autocmd({ "CursorHold", "CursorMoved" }, {
   callback = show_git_blame,
 })
 
+--- ###################################################################
+--- accessability
+require('wgvim.reading').setup({ rainbow = true, scope = true, references = true })
+
+-- set list listchars=leadmultispace:│\ \ \
+
+local dict = vim.fn.stdpath('state') .. '/harper'
+vim.lsp.config('harper_ls', {
+  cmd = { 'harper-ls', '--stdio' },
+  filetypes = { 'markdown', 'text', 'gitcommit', 'c', 'cpp', 'lua' },
+  root_markers = { '.git' },
+  settings = { ['harper-ls'] = { 
+      --linters = { SentenceCapitalization = false },
+      linters = { NoFrenchSpaces = false } ,
+      userDictPath = dict .. '/dictionary.txt',
+      fileDictPath = dict .. '/file_dictionaries'
+  } },
+  handlers = {
+    ['textDocument/publishDiagnostics'] = function(err, result, ctx)
+      local client = vim.lsp.get_client_by_id(ctx.client_id)
+      local bufnr = result and vim.uri_to_bufnr(result.uri)
+      if client and bufnr and vim.api.nvim_buf_is_loaded(bufnr) then
+        result.diagnostics = vim.tbl_filter(function(d)
+          local r = d.range
+          if d.code ~= 'Spaces' or r.start.line ~= r['end'].line then
+            return true
+          end
+          local line = vim.api.nvim_buf_get_lines(bufnr, r.start.line, r.start.line + 1, false)[1] or ''
+          local s = vim.str_byteindex(line, client.offset_encoding, r.start.character, false)
+          local e = vim.str_byteindex(line, client.offset_encoding, r['end'].character, false)
+          local after_sentence = line:sub(1, s):match('[.?!]["\')%]’”]*$') ~= nil
+          return not (after_sentence and line:sub(s + 1, e) == '  ')
+        end, result.diagnostics)
+      end
+      return vim.lsp.diagnostic.on_publish_diagnostics(err, result, ctx)
+    end,
+  },
+})
+vim.lsp.enable('harper_ls')
+
+vim.keymap.set('n', '<leader>hp', function()
+  local on = not vim.lsp.is_enabled('harper_ls')
+  vim.lsp.enable('harper_ls', on)
+  vim.notify('Harper ' .. (on and 'on' or 'off'))
+end, { desc = 'Toggle Harper spell/grammar checking' })
