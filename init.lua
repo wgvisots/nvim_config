@@ -1,3 +1,13 @@
+---------------------------------------------------------------------------
+-- init.lua
+--
+-- Based on nvim-lite (pluginless branch) by Radley Lewis,
+--   https://github.com/radleylewis/nvim-lite/tree/pluginless
+-- whose copyright in the original code remains with its author.
+--
+-- Modifications and additions Copyright 2026 W. Greg Visotski
+---------------------------------------------------------------------------
+
 -- theme & transparency
 -- vim.cmd.colorscheme("wildcharm") -- also good: sorbet, habermax, unokai
 vim.api.nvim_set_hl(0, "Normal", { bg = "none" })
